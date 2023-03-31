@@ -1,9 +1,9 @@
-import os.path as osp
-
 import mmcv
 import numpy as np
+import os.path as osp
 
 from ..builder import PIPELINES
+from ..cityscapes_labels import labels as LABELS
 
 
 @PIPELINES.register_module()
@@ -151,3 +151,15 @@ class LoadAnnotations(object):
         repr_str += f'(reduce_zero_label={self.reduce_zero_label},'
         repr_str += f"imdecode_backend='{self.imdecode_backend}')"
         return repr_str
+
+@PIPELINES.register_module()
+class LoadAnnotationsCS(LoadAnnotations):
+    def __call__(self, results):
+        d = super().__call__(results)
+        seg_color = d['gt_semantic_seg']
+        seg_id = np.ones(seg_color.shape[:2]).astype(np.uint8) * 255
+        for label in LABELS:
+            if label.inCityscapes and not label.ignoreInEval:
+                seg_id[(seg_color == label.color).all(axis=2)] = label.trainId
+        d['gt_semantic_seg'] = seg_id
+        return d
