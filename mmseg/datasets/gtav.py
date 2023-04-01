@@ -98,6 +98,24 @@ class GTAVDataset(CustomDataset):
 
         return result_files
 
+    def get_gt_seg_maps(self, efficient_test=False):
+        """Get ground truth segmentation maps for evaluation."""
+        gt_seg_maps = []
+        for img_info in self.img_infos:
+            seg_map = osp.join(self.ann_dir, img_info['ann']['seg_map'])
+            if efficient_test:
+                gt_seg_map = seg_map
+            else:
+                gt_seg_map = mmcv.imread(
+                    seg_map, flag='unchanged', backend='pillow')
+            seg_id = np.ones(gt_seg_map.shape[:2]).astype(np.uint8) * 255
+            for label in LABELS:
+                if label.inCityscapes and not label.ignoreInEval:
+                    seg_id[(gt_seg_map == label.color).all(axis=2)] = label.trainId
+
+            gt_seg_maps.append(seg_id)
+        return gt_seg_maps
+
     def format_results(self, results, imgfile_prefix=None, to_label_id=True):
         """Format the results into dir (standard format for Cityscapes
         evaluation).
@@ -162,7 +180,7 @@ class GTAVDataset(CustomDataset):
         metrics = metric.copy() if isinstance(metric, list) else [metric]
         if len(metrics) > 0:
             eval_results.update(
-                super(CarlaDataset,
+                super(GTAVDataset,
                       self).evaluate(results, metrics, logger, efficient_test))
 
         return eval_results
